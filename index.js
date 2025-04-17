@@ -27,16 +27,20 @@ app.post("/create-checkout-session", async (req, res) => {
     const teamId = process.env.MASSIVE_TEAM_ID;
     const apiKey = process.env.MASSIVE_API_KEY;
 
+    const masvPayload = {
+      package: {
+        description: project || "DLVRIT.ai post‑production job",
+        name: `Upload for ${email}`,
+        sender: email,
+        recipients: [{ email }]
+      }
+    };
+
+    console.log("Sending to MASV:", JSON.stringify(masvPayload, null, 2));
+
     const pkgRes = await axios.post(
       `https://api.massive.app/v1.1/teams/${teamId}/packages`,
-      {
-        package: {
-          description: project || "DLVRIT.ai post‑production job",
-          name: `Upload for ${email}`,
-          sender: email,
-          recipients: [{ email }]
-        }
-      },
+      masvPayload,
       {
         headers: {
           "X-API-KEY": apiKey,
