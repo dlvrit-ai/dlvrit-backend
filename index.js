@@ -44,7 +44,8 @@ app.post("/create-checkout-session", async (req, res) => {
         headers: {
           "X-API-KEY": apiKey,
           "Content-Type": "application/json"
-        }
+        },
+        timeout: 10000 // 10 seconds
       }
     );
 
@@ -86,7 +87,13 @@ app.post("/create-checkout-session", async (req, res) => {
     res.send({ success: true, uploadUrl });
 
   } catch (err) {
-    console.error("Error:", err.response?.status, err.response?.data || err.message);
+    console.error("Unexpected error:", {
+      status: err.response?.status,
+      headers: err.response?.headers,
+      data: err.response?.data,
+      message: err.message
+    });
+
     res.status(err.response?.status || 500).send({
       error: err.response?.data?.message || err.message
     });
