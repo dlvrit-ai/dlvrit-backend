@@ -30,7 +30,7 @@ app.post("/create-checkout-session", async (req, res) => {
       metadata: { product_id, quantity, email, project }
     });
 
-    // 2. Create package via MASV
+    // 2. Create package via MASV (no wrapper)
     const teamId    = process.env.MASSIVE_TEAM_ID;
     const apiKey    = process.env.MASSIVE_API_KEY;
     const portalUrl = process.env.MASSIVE_PORTAL_URL;
@@ -47,11 +47,11 @@ app.post("/create-checkout-session", async (req, res) => {
     };
 
     console.log("📤 Sending MASV package request:");
-    console.log(JSON.stringify({ package: masvPayload }, null, 2));
+    console.log(JSON.stringify(masvPayload, null, 2));
 
     const pkgRes = await axios.post(
       `https://api.massive.app/v1/teams/${teamId}/packages`,
-      { package: masvPayload }, // 🟢 WRAPPED as required
+      masvPayload,
       {
         headers: {
           "X-API-KEY": apiKey,
