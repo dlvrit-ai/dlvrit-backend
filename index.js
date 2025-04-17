@@ -12,8 +12,13 @@ app.post("/create-checkout-session", async (req, res) => {
   const { payment_method, product_id, quantity, email, project } = req.body;
 
   try {
-    // 1) Charge via Stripe
+    if (!payment_method || !product_id || !quantity || !email) {
+      throw new Error("Missing required payment or contact information.");
+    }
+
     const totalAmount = quantity * 16000; // £160/min in pence
+
+    // 1) Process Stripe payment
     await stripe.paymentIntents.create({
       amount: totalAmount,
       currency: "gbp",
@@ -23,18 +28,26 @@ app.post("/create-checkout-session", async (req, res) => {
       metadata: { product_id, quantity, email, project }
     });
 
-    // 2) Create upload package on your TEAM via MASV v1
+    // 2) Create upload package on MASV team
     const teamId = process.env.MASSIVE_TEAM_ID;
     const apiKey = process.env.MASSIVE_API_KEY;
 
+    if (!teamId || !apiKey) {
+      throw new Error("Missing MASV team credentials.");
+    }
+
+    const uploadPayload = {
+      description: project || "DLVRIT.ai post‑production job",
+      name:        `Upload for ${email}`,
+      sender:      email,
+      recipients:  [{ email }]
+    };
+
+    console.log("Sending to MASV:", JSON.stringify(uploadPayload, null, 2));
+
     const pkgRes = await axios.post(
       `https://api.massive.app/v1/teams/${teamId}/packages`,
-      {
-        description: project || "DLVRIT.ai post‑production job",
-        name:        `Upload for ${email}`,
-        sender:      email,
-        recipients: [{ email }]           // ← required by MASV
-      },
+      uploadPayload,
       {
         headers: {
           "X-API-KEY": apiKey,
@@ -43,7 +56,7 @@ app.post("/create-checkout-session", async (req, res) => {
       }
     );
 
-    // 3) Extract or build the upload URL
+    // 3) Build fallback URL if needed
     let uploadUrl = pkgRes.data.upload_url;
     if (!uploadUrl && pkgRes.data.access_token) {
       const portalUrl = process.env.MASSIVE_PORTAL_URL; // e.g. "dlvrit.portal.massive.io"
@@ -51,10 +64,10 @@ app.post("/create-checkout-session", async (req, res) => {
     }
 
     if (!uploadUrl) {
-      throw new Error("MASV did not return an upload URL");
+      throw new Error("MASV did not return a valid upload URL.");
     }
 
-    // 4) Email the customer their link
+    // 4) Send email to customer
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: +process.env.SMTP_PORT || 587,
@@ -66,8 +79,8 @@ app.post("/create-checkout-session", async (req, res) => {
     });
 
     await transporter.sendMail({
-      from:    `"DLVRIT.ai" <noreply@dlvrit.ai>`,
-      to:      email,
+      from: `"DLVRIT.ai" <noreply@dlvrit.ai>`,
+      to: email,
       subject: "Your DLVRIT.ai upload link",
       html: `
         <p>Thanks for your payment!</p>
@@ -78,7 +91,7 @@ app.post("/create-checkout-session", async (req, res) => {
       `
     });
 
-    // 5) Return the link to the frontend
+    // 5) Return link to frontend
     res.send({ success: true, uploadUrl });
 
   } catch (err) {
