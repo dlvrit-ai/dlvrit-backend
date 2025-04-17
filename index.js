@@ -78,8 +78,10 @@ const response = await axios({
     res.send({ success: true, uploadUrl });
 
   } catch (error) {
-    console.error("Error:", error.message || error);
-    res.status(400).send({ error: error.message || "Unknown error" });
+    console.error("Error:", error.response?.status, error.response?.data || error.message);
+res.status(error.response?.status || 500).send({
+  error: error.response?.data?.message || error.message || "Unknown error"
+});
   }
 });
 
