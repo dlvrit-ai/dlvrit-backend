@@ -30,6 +30,7 @@ app.post("/create-checkout-session", async (req, res) => {
     });
 
 // 2. Create upload link via Massive.io
+const portalId = process.env.MASSIVE_PORTAL_ID;
 const response = await axios({
   method: 'post',
   url: `https://api.massive.app/v1/uploads`,
