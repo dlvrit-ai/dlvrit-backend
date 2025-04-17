@@ -34,12 +34,10 @@ app.post("/create-checkout-session", async (req, res) => {
     const portalUrl = process.env.MASSIVE_PORTAL_URL;
 
     const masvPayload = {
-      package: {
-        description: project || "DLVRIT.ai finishing job",
-        name:        `Upload for ${email}`,
-        sender:      email,
-        recipients: [{ email }]
-      }
+      description: project || "DLVRIT.ai finishing job",
+      name:        `Upload for ${email}`,
+      sender:      email,
+      recipients: [{ email }]
     };
 
     console.log("📤 Sending to MASV:");
