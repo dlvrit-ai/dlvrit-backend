@@ -32,7 +32,8 @@ app.post("/create-checkout-session", async (req, res) => {
       {
         description: project || "DLVRIT.ai post‑production job",
         name:        `Upload for ${email}`,
-        sender:      email
+        sender:      email,
+        recipients: [{ email }]           // ← required by MASV
       },
       {
         headers: {
@@ -42,10 +43,9 @@ app.post("/create-checkout-session", async (req, res) => {
       }
     );
 
-    // 3) Figure out the uploadUrl
+    // 3) Extract or build the upload URL
     let uploadUrl = pkgRes.data.upload_url;
     if (!uploadUrl && pkgRes.data.access_token) {
-      // fallback to portal URL if only token returned
       const portalUrl = process.env.MASSIVE_PORTAL_URL; // e.g. "dlvrit.portal.massive.io"
       uploadUrl = `https://${portalUrl}/upload/${pkgRes.data.access_token}`;
     }
@@ -54,7 +54,7 @@ app.post("/create-checkout-session", async (req, res) => {
       throw new Error("MASV did not return an upload URL");
     }
 
-    // 4) Email the customer
+    // 4) Email the customer their link
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: +process.env.SMTP_PORT || 587,
