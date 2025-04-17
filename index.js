@@ -12,48 +12,41 @@ app.post("/create-checkout-session", async (req, res) => {
   const { payment_method, product_id, quantity, email, project } = req.body;
 
   try {
-    const totalAmount = quantity * 16000; // £160 per minute
-
     // 1. Process payment
-    const paymentIntent = await stripe.paymentIntents.create({
+    const totalAmount = quantity * 16000; // £160 per minute (in pence)
+    await stripe.paymentIntents.create({
       amount: totalAmount,
       currency: "gbp",
-      payment_method: payment_method,
+      payment_method,
       confirm: true,
       receipt_email: email,
-      metadata: {
-        product_id,
-        quantity,
-        email,
-        project
-      }
+      metadata: { product_id, quantity, email, project }
     });
 
-// 2. Create upload link via Massive.io
-const portalId = process.env.MASSIVE_PORTAL_ID;
+    // 2. Create upload package via Massive.io v1.1
+    const portalId  = process.env.MASSIVE_PORTAL_ID;
+    const portalUrl = process.env.MASSIVE_PORTAL_URL;  // e.g. "dlvrit.portal.massive.io"
 
-const response = await axios({
-  method: 'post',
-  url: `https://api.massive.app/v1/portals/uploads`,
-  headers: {
-    Authorization: `Bearer ${process.env.MASSIVE_API_KEY}`,
-    "Content-Type": "application/json"
-  },
-  data: {
-    portal_id: portalId
-  }
-});
+    const pkgResponse = await axios.post(
+      `https://api.massive.app/v1.1/portals/${portalId}/packages`,
+      {
+        description: project || "DLVRIT.ai post‑production job",
+        name:        `Upload for ${email}`,
+        sender:      email
+      },
+      {
+        headers: { "Content-Type": "application/json" }
+      }
+    );
 
-    const uploadUrl = response.data?.upload_url;
-
-    if (!uploadUrl) {
-      throw new Error("Failed to get upload URL from Massive.io");
-    }
+    // Build the actual upload URL from the returned access_token
+    const token     = pkgResponse.data.access_token;
+    const uploadUrl = `https://${portalUrl}/upload/${token}`;
 
     // 3. Send confirmation email
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || "587"),
+      port: +process.env.SMTP_PORT || 587,
       secure: false,
       auth: {
         user: process.env.SMTP_USER,
@@ -62,8 +55,8 @@ const response = await axios({
     });
 
     await transporter.sendMail({
-      from: '"DLVRIT.ai" <noreply@dlvrit.ai>',
-      to: email,
+      from:    `"DLVRIT.ai" <noreply@dlvrit.ai>`,
+      to:      email,
       subject: "Your DLVRIT.ai upload link",
       html: `
         <p>Thanks for your payment!</p>
@@ -74,14 +67,14 @@ const response = await axios({
       `
     });
 
-    // 4. Return the link to the frontend as well
+    // 4. Return upload link to frontend
     res.send({ success: true, uploadUrl });
 
   } catch (error) {
     console.error("Error:", error.response?.status, error.response?.data || error.message);
-res.status(error.response?.status || 500).send({
-  error: error.response?.data?.message || error.message || "Unknown error"
-});
+    res
+      .status(error.response?.status || 500)
+      .send({ error: error.response?.data?.message || error.message });
   }
 });
 
@@ -91,5 +84,5 @@ app.get("/", (req, res) => {
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
-  console.log("Server running on port", port);
+  console.log(`Server running on port ${port}`);
 });
