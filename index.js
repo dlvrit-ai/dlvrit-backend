@@ -1,8 +1,8 @@
-const express = require("express");
-const app = express();
-const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
-const axios = require("axios");
-const cors = require("cors");
+const express    = require("express");
+const app        = express();
+const stripe     = require("stripe")(process.env.STRIPE_SECRET_KEY);
+const axios      = require("axios");
+const cors       = require("cors");
 const nodemailer = require("nodemailer");
 
 app.use(cors());
@@ -12,8 +12,8 @@ app.post("/create-checkout-session", async (req, res) => {
   const { payment_method, product_id, quantity, email, project } = req.body;
 
   try {
-    // 1. Charge via Stripe
-    const totalAmount = quantity * 16000; // £160/minute in pence
+    // 1) Charge via Stripe
+    const totalAmount = quantity * 16000; // £160/min in pence
     await stripe.paymentIntents.create({
       amount: totalAmount,
       currency: "gbp",
@@ -23,25 +23,25 @@ app.post("/create-checkout-session", async (req, res) => {
       metadata: { product_id, quantity, email, project }
     });
 
-    // 2. Create a new upload package on MASV (v1.1 API)
+    // 2) Create a new Portal package on MASV v1.1
     const portalId  = process.env.MASSIVE_PORTAL_ID;
     const portalUrl = process.env.MASSIVE_PORTAL_URL; // e.g. "dlvrit.portal.massive.io"
 
     const pkgRes = await axios.post(
       `https://api.massive.app/v1.1/portals/${portalId}/packages`,
       {
-        description: project || "DLVRIT.ai post‑production job",
+        description: project || "DLVRIT.ai post‐production job",
         name:        `Upload for ${email}`,
         sender:      email
       },
       { headers: { "Content-Type": "application/json" } }
     );
 
-    // Build the actual upload URL from the returned access_token
+    // 3) Build the upload link from the returned access_token
     const token     = pkgRes.data.access_token;
     const uploadUrl = `https://${portalUrl}/upload/${token}`;
 
-    // 3. Email the customer their upload link
+    // 4) Email confirmation to your customer
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: +process.env.SMTP_PORT || 587,
@@ -65,7 +65,7 @@ app.post("/create-checkout-session", async (req, res) => {
       `
     });
 
-    // 4. Return the upload URL to the frontend
+    // 5) Return the link to the frontend
     res.send({ success: true, uploadUrl });
 
   } catch (err) {
@@ -81,6 +81,4 @@ app.get("/", (req, res) => {
 });
 
 const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-});
+app.listen(port, () => console.log(`Server listening on port ${port}`));
