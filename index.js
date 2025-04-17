@@ -49,11 +49,11 @@ app.post("/create-checkout-session", async (req, res) => {
 
     const pkgRes = await axios.post(
       `https://api.massive.app/v1/teams/${teamId}/packages`,
-      masvPayload,
+      JSON.stringify(masvPayload),
       {
         headers: {
           "X-API-KEY": apiKey,
-          "Content-Type": "application/json"
+          "Content-Type": "application/json; charset=utf-8"
         },
         timeout: 10000
       }
