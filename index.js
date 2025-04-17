@@ -31,12 +31,16 @@ app.post("/create-checkout-session", async (req, res) => {
 
     // 2. Create upload link via Massive.io
     const portalId = process.env.MASSIVE_PORTAL_ID;
-    const response = await axios.post("https://api.massive.io/api/v1/portals/" + portalId + "/uploads", {}, {
-      headers: {
-        "Authorization": "Bearer " + process.env.MASSIVE_API_KEY,
-        "Content-Type": "application/json"
+    const response = await axios.post(
+      `https://api.massive.io/api/v1/portals/${portalId}/uploads`,
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.MASSIVE_API_KEY}`,
+          "Content-Type": "application/json"
+        }
       }
-    });
+    );
 
     const uploadUrl = response.data?.upload_url;
 
@@ -56,17 +60,16 @@ app.post("/create-checkout-session", async (req, res) => {
     });
 
     await transporter.sendMail({
-      from: '"DLVRIT.ai" <no-reply@dlvrit.ai>',
+      from: '"DLVRIT.ai" <noreply@dlvrit.ai>',
       to: email,
       subject: "Your DLVRIT.ai upload link",
-html: `
-  <p>Thanks for your payment!</p>
-  <p><strong>Project:</strong> ${project || "N/A"}<br>
-  <strong>Minutes:</strong> ${quantity}<br>
-  <strong>Upload link:</strong> <a href="${uploadUrl}">${uploadUrl}</a></p>
-  <p>Please upload your file using the link above.</p>
-`
-      \`
+      html: `
+        <p>Thanks for your payment!</p>
+        <p><strong>Project:</strong> ${project || "N/A"}<br>
+        <strong>Minutes:</strong> ${quantity}<br>
+        <strong>Upload link:</strong> <a href="${uploadUrl}">${uploadUrl}</a></p>
+        <p>Please upload your file using the link above.</p>
+      `
     });
 
     // 4. Return the link to the frontend as well
