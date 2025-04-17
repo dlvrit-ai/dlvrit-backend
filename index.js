@@ -23,25 +23,38 @@ app.post("/create-checkout-session", async (req, res) => {
       metadata: { product_id, quantity, email, project }
     });
 
-    // 2) Create a new Portal package on MASV v1.1
-    const portalId  = process.env.MASSIVE_PORTAL_ID;
-    const portalUrl = process.env.MASSIVE_PORTAL_URL; // e.g. "dlvrit.portal.massive.io"
+    // 2) Create upload package on your TEAM via MASV v1
+    const teamId = process.env.MASSIVE_TEAM_ID;
+    const apiKey = process.env.MASSIVE_API_KEY;
 
     const pkgRes = await axios.post(
-      `https://api.massive.app/v1.1/portals/${portalId}/packages`,
+      `https://api.massive.app/v1/teams/${teamId}/packages`,
       {
-        description: project || "DLVRIT.ai post‐production job",
+        description: project || "DLVRIT.ai post‑production job",
         name:        `Upload for ${email}`,
         sender:      email
       },
-      { headers: { "Content-Type": "application/json" } }
+      {
+        headers: {
+          "X-API-KEY": apiKey,
+          "Content-Type": "application/json"
+        }
+      }
     );
 
-    // 3) Build the upload link from the returned access_token
-    const token     = pkgRes.data.access_token;
-    const uploadUrl = `https://${portalUrl}/upload/${token}`;
+    // 3) Figure out the uploadUrl
+    let uploadUrl = pkgRes.data.upload_url;
+    if (!uploadUrl && pkgRes.data.access_token) {
+      // fallback to portal URL if only token returned
+      const portalUrl = process.env.MASSIVE_PORTAL_URL; // e.g. "dlvrit.portal.massive.io"
+      uploadUrl = `https://${portalUrl}/upload/${pkgRes.data.access_token}`;
+    }
 
-    // 4) Email confirmation to your customer
+    if (!uploadUrl) {
+      throw new Error("MASV did not return an upload URL");
+    }
+
+    // 4) Email the customer
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: +process.env.SMTP_PORT || 587,
