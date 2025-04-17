@@ -14,7 +14,12 @@ app.post("/create-checkout-session", async (req, res) => {
   try {
     const totalAmount = quantity * 16000; // £160 per minute
 
-    // 1. Process Stripe payment
+    console.log("Stripe Payment Intent - preparing to create");
+    console.log("email:", email);
+    console.log("project:", project);
+    console.log("quantity:", quantity);
+    console.log("product_id:", product_id);
+
     await stripe.paymentIntents.create({
       amount: totalAmount,
       currency: "gbp",
@@ -24,7 +29,6 @@ app.post("/create-checkout-session", async (req, res) => {
       metadata: { product_id, quantity, email, project }
     });
 
-    // 2. Create MASV package using team endpoint
     const teamId = process.env.MASSIVE_TEAM_ID;
     const apiKey = process.env.MASSIVE_API_KEY;
     const portalUrl = process.env.MASSIVE_PORTAL_URL;
@@ -36,7 +40,9 @@ app.post("/create-checkout-session", async (req, res) => {
       recipients: [{ email }]
     };
 
-    console.log("Sending to MASV:", JSON.stringify(masvPayload, null, 2));
+    // 🔍 Debugging payload
+    console.log("Sending to MASV:");
+    console.log(JSON.stringify(masvPayload, null, 2));
 
     const pkgRes = await axios.post(
       `https://api.massive.app/v1/teams/${teamId}/packages`,
@@ -60,7 +66,6 @@ app.post("/create-checkout-session", async (req, res) => {
       throw new Error("MASV did not return an upload URL");
     }
 
-    // 3. Send email with upload link
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: +process.env.SMTP_PORT || 587,
@@ -84,16 +89,14 @@ app.post("/create-checkout-session", async (req, res) => {
       `
     });
 
-    // 4. Return success to the frontend
     res.send({ success: true, uploadUrl });
 
   } catch (err) {
-    console.error("Unexpected error:", {
-      status: err.response?.status,
-      headers: err.response?.headers,
-      data: err.response?.data,
-      message: err.message
-    });
+    console.error("❌ Unexpected error:");
+    console.error("Status:", err.response?.status);
+    console.error("Headers:", err.response?.headers);
+    console.error("Data:", err.response?.data);
+    console.error("Message:", err.message);
 
     res.status(err.response?.status || 500).send({
       error: err.response?.data?.message || err.message
