@@ -12,8 +12,8 @@ app.post("/create-checkout-session", async (req, res) => {
   const { payment_method, product_id, quantity, email, project } = req.body;
 
   try {
-    // 1. Process payment
-    const totalAmount = quantity * 16000; // £160 per minute (in pence)
+    // 1. Charge via Stripe
+    const totalAmount = quantity * 16000; // £160/minute in pence
     await stripe.paymentIntents.create({
       amount: totalAmount,
       currency: "gbp",
@@ -23,27 +23,25 @@ app.post("/create-checkout-session", async (req, res) => {
       metadata: { product_id, quantity, email, project }
     });
 
-    // 2. Create upload package via Massive.io v1.1
+    // 2. Create a new upload package on MASV (v1.1 API)
     const portalId  = process.env.MASSIVE_PORTAL_ID;
-    const portalUrl = process.env.MASSIVE_PORTAL_URL;  // e.g. "dlvrit.portal.massive.io"
+    const portalUrl = process.env.MASSIVE_PORTAL_URL; // e.g. "dlvrit.portal.massive.io"
 
-    const pkgResponse = await axios.post(
+    const pkgRes = await axios.post(
       `https://api.massive.app/v1.1/portals/${portalId}/packages`,
       {
         description: project || "DLVRIT.ai post‑production job",
         name:        `Upload for ${email}`,
         sender:      email
       },
-      {
-        headers: { "Content-Type": "application/json" }
-      }
+      { headers: { "Content-Type": "application/json" } }
     );
 
     // Build the actual upload URL from the returned access_token
-    const token     = pkgResponse.data.access_token;
+    const token     = pkgRes.data.access_token;
     const uploadUrl = `https://${portalUrl}/upload/${token}`;
 
-    // 3. Send confirmation email
+    // 3. Email the customer their upload link
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: +process.env.SMTP_PORT || 587,
@@ -67,14 +65,14 @@ app.post("/create-checkout-session", async (req, res) => {
       `
     });
 
-    // 4. Return upload link to frontend
+    // 4. Return the upload URL to the frontend
     res.send({ success: true, uploadUrl });
 
-  } catch (error) {
-    console.error("Error:", error.response?.status, error.response?.data || error.message);
+  } catch (err) {
+    console.error("Error:", err.response?.status, err.response?.data || err.message);
     res
-      .status(error.response?.status || 500)
-      .send({ error: error.response?.data?.message || error.message });
+      .status(err.response?.status || 500)
+      .send({ error: err.response?.data?.message || err.message });
   }
 });
 
