@@ -14,7 +14,7 @@ app.post("/create-checkout-session", async (req, res) => {
   try {
     const totalAmount = quantity * 16000; // £160 per minute
 
-    console.log("📦 Stripe Payment - creating PaymentIntent");
+    console.log("📦 Stripe PaymentIntent:");
     console.log("→ Email:", email);
     console.log("→ Project:", project);
     console.log("→ Quantity:", quantity);
@@ -34,13 +34,17 @@ app.post("/create-checkout-session", async (req, res) => {
     const portalUrl = process.env.MASSIVE_PORTAL_URL;
 
     const masvPayload = {
-      description: project || "DLVRIT.ai finishing job",
-      name:        `Upload for ${email}`,
-      sender:      email,
-      recipients: [{ email }]
+      description: typeof project === "string" && project.trim()
+        ? project.trim()
+        : "Upload package for DLVRIT",
+      name: "DLVRIT Upload",
+      sender: email,
+      recipients: [
+        { email }
+      ]
     };
 
-    console.log("📤 Sending to MASV:");
+    console.log("📤 Sending MASV package request:");
     console.log(JSON.stringify(masvPayload, null, 2));
 
     const pkgRes = await axios.post(
@@ -56,7 +60,6 @@ app.post("/create-checkout-session", async (req, res) => {
     );
 
     let uploadUrl = pkgRes.data.upload_url;
-
     if (!uploadUrl && pkgRes.data.access_token) {
       uploadUrl = `https://${portalUrl}/upload/${pkgRes.data.access_token}`;
     }
