@@ -1,8 +1,8 @@
-const express = require("express");
-const app = express();
-const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
-const axios = require("axios");
-const cors = require("cors");
+const express    = require("express");
+const app        = express();
+const stripe     = require("stripe")(process.env.STRIPE_SECRET_KEY);
+const axios      = require("axios");
+const cors       = require("cors");
 const nodemailer = require("nodemailer");
 
 app.use(cors());
@@ -14,11 +14,11 @@ app.post("/create-checkout-session", async (req, res) => {
   try {
     const totalAmount = quantity * 16000; // £160 per minute
 
-    console.log("Stripe Payment Intent - preparing to create");
-    console.log("email:", email);
-    console.log("project:", project);
-    console.log("quantity:", quantity);
-    console.log("product_id:", product_id);
+    console.log("📦 Stripe Payment - creating PaymentIntent");
+    console.log("→ Email:", email);
+    console.log("→ Project:", project);
+    console.log("→ Quantity:", quantity);
+    console.log("→ Product ID:", product_id);
 
     await stripe.paymentIntents.create({
       amount: totalAmount,
@@ -29,19 +29,20 @@ app.post("/create-checkout-session", async (req, res) => {
       metadata: { product_id, quantity, email, project }
     });
 
-    const teamId = process.env.MASSIVE_TEAM_ID;
-    const apiKey = process.env.MASSIVE_API_KEY;
+    const teamId    = process.env.MASSIVE_TEAM_ID;
+    const apiKey    = process.env.MASSIVE_API_KEY;
     const portalUrl = process.env.MASSIVE_PORTAL_URL;
 
     const masvPayload = {
-      description: project || "DLVRIT.ai finishing job",
-      name: `Upload for ${email}`,
-      sender: email,
-      recipients: [{ email }]
+      package: {
+        description: project || "DLVRIT.ai finishing job",
+        name:        `Upload for ${email}`,
+        sender:      email,
+        recipients: [{ email }]
+      }
     };
 
-    // 🔍 Debugging payload
-    console.log("Sending to MASV:");
+    console.log("📤 Sending to MASV:");
     console.log(JSON.stringify(masvPayload, null, 2));
 
     const pkgRes = await axios.post(
@@ -110,5 +111,5 @@ app.get("/", (req, res) => {
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
-  console.log(`Server listening on port ${port}`);
+  console.log(`🚀 Server listening on port ${port}`);
 });
