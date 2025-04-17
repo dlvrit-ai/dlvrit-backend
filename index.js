@@ -12,7 +12,7 @@ app.post("/create-checkout-session", async (req, res) => {
   const { payment_method, product_id, quantity, email, project } = req.body;
 
   try {
-    const totalAmount = quantity * 16000;
+    const totalAmount = quantity * 16000; // £160 per minute
 
     console.log("📦 Stripe PaymentIntent:");
     console.log("→ Email:", email);
@@ -20,6 +20,7 @@ app.post("/create-checkout-session", async (req, res) => {
     console.log("→ Quantity:", quantity);
     console.log("→ Product ID:", product_id);
 
+    // 1. Stripe PaymentIntent
     await stripe.paymentIntents.create({
       amount: totalAmount,
       currency: "gbp",
@@ -29,17 +30,16 @@ app.post("/create-checkout-session", async (req, res) => {
       metadata: { product_id, quantity, email, project }
     });
 
+    // 2. Create package via MASV
     const teamId    = process.env.MASSIVE_TEAM_ID;
     const apiKey    = process.env.MASSIVE_API_KEY;
     const portalUrl = process.env.MASSIVE_PORTAL_URL;
 
     const masvPayload = {
-      description: typeof project === "string" && project.trim()
-        ? project.trim()
-        : "Upload package for DLVRIT",
+      description: typeof project === "string" && project.trim() ? project.trim() : "Upload package for DLVRIT",
       name: "DLVRIT Upload",
       sender: email,
-      recipients: [email] // ✅ updated as per MASV support
+      recipients: [email] // Updated format
     };
 
     console.log("📤 Sending MASV package request:");
@@ -66,6 +66,7 @@ app.post("/create-checkout-session", async (req, res) => {
       throw new Error("MASV did not return an upload URL");
     }
 
+    // 3. Send confirmation email
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: +process.env.SMTP_PORT || 587,
@@ -84,11 +85,12 @@ app.post("/create-checkout-session", async (req, res) => {
         <p>Thanks for your payment!</p>
         <p><strong>Project:</strong> ${project || "N/A"}<br>
         <strong>Minutes:</strong> ${quantity}<br>
-        <strong>Upload link:</strong> <a href="${uploadUrl}">${uploadUrl}</a></p>
-        <p>Please upload your file using the link above.</p>
+        <strong>Upload your file here:</strong> <a href="${uploadUrl}">${uploadUrl}</a></p>
+        <p>Please upload your file using the link above. No account required.</p>
       `
     });
 
+    // 4. Respond to frontend with redirect URL
     res.send({ success: true, uploadUrl });
 
   } catch (err) {
