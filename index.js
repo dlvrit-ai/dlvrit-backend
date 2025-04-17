@@ -23,9 +23,9 @@ app.post("/create-checkout-session", async (req, res) => {
       metadata: { product_id, quantity, email, project }
     });
 
-    // 2) Create upload package using MASV API (v1.1 team endpoint)
-    const teamId = process.env.MASSIVE_TEAM_ID;
+    // 2) Create upload package using MASV API
     const apiKey = process.env.MASSIVE_API_KEY;
+    const portalUrl = process.env.MASSIVE_PORTAL_URL; // e.g. dlvrit.portal.massive.io
 
     const masvPayload = {
       package: {
@@ -39,7 +39,7 @@ app.post("/create-checkout-session", async (req, res) => {
     console.log("Sending to MASV:", JSON.stringify(masvPayload, null, 2));
 
     const pkgRes = await axios.post(
-      `https://api.massive.app/v1.1/teams/${teamId}/packages`,
+      `https://api.massive.app/v1.1/packages`,
       masvPayload,
       {
         headers: {
@@ -49,10 +49,10 @@ app.post("/create-checkout-session", async (req, res) => {
       }
     );
 
-    // 3) Generate upload link
+    // 3) Extract upload URL
     let uploadUrl = pkgRes.data.upload_url;
+
     if (!uploadUrl && pkgRes.data.access_token) {
-      const portalUrl = process.env.MASSIVE_PORTAL_URL; // e.g. "dlvrit.portal.massive.io"
       uploadUrl = `https://${portalUrl}/upload/${pkgRes.data.access_token}`;
     }
 
@@ -60,7 +60,7 @@ app.post("/create-checkout-session", async (req, res) => {
       throw new Error("MASV did not return an upload URL");
     }
 
-    // 4) Send confirmation email
+    // 4) Send email to customer
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: +process.env.SMTP_PORT || 587,
@@ -84,7 +84,7 @@ app.post("/create-checkout-session", async (req, res) => {
       `
     });
 
-    // 5) Respond to frontend
+    // 5) Return to frontend
     res.send({ success: true, uploadUrl });
 
   } catch (err) {
