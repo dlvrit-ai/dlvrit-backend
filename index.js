@@ -12,8 +12,9 @@ app.post("/create-checkout-session", async (req, res) => {
   const { payment_method, product_id, quantity, email, project } = req.body;
 
   try {
-    // 1) Process payment via Stripe
     const totalAmount = quantity * 16000; // £160 per minute in pence
+
+    // 1) Charge via Stripe
     await stripe.paymentIntents.create({
       amount: totalAmount,
       currency: "gbp",
@@ -23,23 +24,21 @@ app.post("/create-checkout-session", async (req, res) => {
       metadata: { product_id, quantity, email, project }
     });
 
-    // 2) Create upload package using MASV API
+    // 2) Create MASV upload package
     const apiKey = process.env.MASSIVE_API_KEY;
-    const portalUrl = process.env.MASSIVE_PORTAL_URL; // e.g. dlvrit.portal.massive.io
+    const portalUrl = process.env.MASSIVE_PORTAL_URL;
 
     const masvPayload = {
-      package: {
-        description: project || "DLVRIT.ai post‑production job",
-        name: `Upload for ${email}`,
-        sender: email,
-        recipients: [{ email }]
-      }
+      description: project || "DLVRIT.ai post‑production job",
+      name: `Upload for ${email}`,
+      sender: email,
+      recipients: [{ email }]
     };
 
     console.log("Sending to MASV:", JSON.stringify(masvPayload, null, 2));
 
     const pkgRes = await axios.post(
-      `https://api.massive.app/v1.1/packages`,
+      `https://api.massive.app/v1/packages`,
       masvPayload,
       {
         headers: {
@@ -49,7 +48,6 @@ app.post("/create-checkout-session", async (req, res) => {
       }
     );
 
-    // 3) Extract upload URL
     let uploadUrl = pkgRes.data.upload_url;
 
     if (!uploadUrl && pkgRes.data.access_token) {
@@ -60,7 +58,7 @@ app.post("/create-checkout-session", async (req, res) => {
       throw new Error("MASV did not return an upload URL");
     }
 
-    // 4) Send email to customer
+    // 3) Email the customer
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: +process.env.SMTP_PORT || 587,
@@ -84,14 +82,14 @@ app.post("/create-checkout-session", async (req, res) => {
       `
     });
 
-    // 5) Return to frontend
+    // 4) Respond to frontend
     res.send({ success: true, uploadUrl });
 
   } catch (err) {
     console.error("Error:", err.response?.status, err.response?.data || err.message);
-    res
-      .status(err.response?.status || 500)
-      .send({ error: err.response?.data?.message || err.message });
+    res.status(err.response?.status || 500).send({
+      error: err.response?.data?.message || err.message
+    });
   }
 });
 
@@ -100,4 +98,6 @@ app.get("/", (req, res) => {
 });
 
 const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`Server listening on port ${port}`));
+app.listen(port, () => {
+  console.log(`Server listening on port ${port}`);
+});
