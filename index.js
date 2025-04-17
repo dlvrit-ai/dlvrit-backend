@@ -29,18 +29,16 @@ app.post("/create-checkout-session", async (req, res) => {
       }
     });
 
-    // 2. Create upload link via Massive.io
-    const portalId = process.env.MASSIVE_PORTAL_ID;
-    const response = await axios.post(
-      `https://api.massive.io/api/v1/portals/${portalId}/uploads`,
-      {},
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.MASSIVE_API_KEY}`,
-          "Content-Type": "application/json"
-        }
-      }
-    );
+// 2. Create upload link via Massive.io
+const portalId = process.env.MASSIVE_PORTAL_ID;
+const response = await axios({
+  method: 'post',
+  url: `https://api.massive.io/api/v1/portals/${portalId}/uploads`,
+  headers: {
+    Authorization: `Bearer ${process.env.MASSIVE_API_KEY}`,
+    "Content-Type": "application/json"
+  }
+});
 
     const uploadUrl = response.data?.upload_url;
 
