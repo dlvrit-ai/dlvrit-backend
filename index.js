@@ -20,6 +20,7 @@ app.post("/create-checkout-session", async (req, res) => {
     console.log("→ Quantity:", quantity);
     console.log("→ Product ID:", product_id);
 
+    // 1. Stripe PaymentIntent
     await stripe.paymentIntents.create({
       amount: totalAmount,
       currency: "gbp",
@@ -29,6 +30,7 @@ app.post("/create-checkout-session", async (req, res) => {
       metadata: { product_id, quantity, email, project }
     });
 
+    // 2. Create package via MASV
     const teamId    = process.env.MASSIVE_TEAM_ID;
     const apiKey    = process.env.MASSIVE_API_KEY;
     const portalUrl = process.env.MASSIVE_PORTAL_URL;
@@ -45,15 +47,15 @@ app.post("/create-checkout-session", async (req, res) => {
     };
 
     console.log("📤 Sending MASV package request:");
-    console.log(JSON.stringify(masvPayload, null, 2));
+    console.log(JSON.stringify({ package: masvPayload }, null, 2));
 
     const pkgRes = await axios.post(
       `https://api.massive.app/v1/teams/${teamId}/packages`,
-      JSON.stringify(masvPayload),
+      { package: masvPayload }, // 🟢 WRAPPED as required
       {
         headers: {
           "X-API-KEY": apiKey,
-          "Content-Type": "application/json; charset=utf-8"
+          "Content-Type": "application/json"
         },
         timeout: 10000
       }
@@ -68,6 +70,7 @@ app.post("/create-checkout-session", async (req, res) => {
       throw new Error("MASV did not return an upload URL");
     }
 
+    // 3. Send confirmation email
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: +process.env.SMTP_PORT || 587,
@@ -91,6 +94,7 @@ app.post("/create-checkout-session", async (req, res) => {
       `
     });
 
+    // 4. Respond to frontend
     res.send({ success: true, uploadUrl });
 
   } catch (err) {
