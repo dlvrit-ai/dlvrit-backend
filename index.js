@@ -12,9 +12,9 @@ app.post("/create-checkout-session", async (req, res) => {
   const { payment_method, product_id, quantity, email, project } = req.body;
 
   try {
-    const totalAmount = quantity * 16000; // £160 per minute in pence
+    const totalAmount = quantity * 16000; // £160 per minute
 
-    // 1) Charge via Stripe
+    // 1. Process Stripe payment
     await stripe.paymentIntents.create({
       amount: totalAmount,
       currency: "gbp",
@@ -24,7 +24,8 @@ app.post("/create-checkout-session", async (req, res) => {
       metadata: { product_id, quantity, email, project }
     });
 
-    // 2) Create MASV upload package
+    // 2. Create MASV package using team endpoint
+    const teamId = process.env.MASSIVE_TEAM_ID;
     const apiKey = process.env.MASSIVE_API_KEY;
     const portalUrl = process.env.MASSIVE_PORTAL_URL;
 
@@ -38,14 +39,14 @@ app.post("/create-checkout-session", async (req, res) => {
     console.log("Sending to MASV:", JSON.stringify(masvPayload, null, 2));
 
     const pkgRes = await axios.post(
-      `https://api.massive.app/v1/packages`,
+      `https://api.massive.app/v1/teams/${teamId}/packages`,
       masvPayload,
       {
         headers: {
           "X-API-KEY": apiKey,
           "Content-Type": "application/json"
         },
-        timeout: 10000 // 10 seconds
+        timeout: 10000
       }
     );
 
@@ -59,7 +60,7 @@ app.post("/create-checkout-session", async (req, res) => {
       throw new Error("MASV did not return an upload URL");
     }
 
-    // 3) Email the customer
+    // 3. Send email with upload link
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: +process.env.SMTP_PORT || 587,
@@ -71,7 +72,7 @@ app.post("/create-checkout-session", async (req, res) => {
     });
 
     await transporter.sendMail({
-      from: `"DLVRIT.ai" <noreply@dlvrit.ai>`,
+      from: '"DLVRIT.ai" <noreply@dlvrit.ai>',
       to: email,
       subject: "Your DLVRIT.ai upload link",
       html: `
@@ -83,7 +84,7 @@ app.post("/create-checkout-session", async (req, res) => {
       `
     });
 
-    // 4) Respond to frontend
+    // 4. Return success to the frontend
     res.send({ success: true, uploadUrl });
 
   } catch (err) {
