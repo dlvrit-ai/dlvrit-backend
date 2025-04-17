@@ -59,12 +59,13 @@ app.post("/create-checkout-session", async (req, res) => {
       from: '"DLVRIT.ai" <no-reply@dlvrit.ai>',
       to: email,
       subject: "Your DLVRIT.ai upload link",
-      html: \`
-        <p>Thanks for your payment!</p>
-        <p><strong>Project:</strong> \${project || "N/A"}<br>
-        <strong>Minutes:</strong> \${quantity}<br>
-        <strong>Upload link:</strong> <a href="\${uploadUrl}">\${uploadUrl}</a></p>
-        <p>Please upload your file using the link above.</p>
+html: `
+  <p>Thanks for your payment!</p>
+  <p><strong>Project:</strong> ${project || "N/A"}<br>
+  <strong>Minutes:</strong> ${quantity}<br>
+  <strong>Upload link:</strong> <a href="${uploadUrl}">${uploadUrl}</a></p>
+  <p>Please upload your file using the link above.</p>
+`
       \`
     });
 
