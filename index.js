@@ -12,6 +12,8 @@ app.post("/create-checkout-session", async (req, res) => {
 
   try {
     const totalAmount = quantity * 16000; // £160 per minute
+    const portalUrl = process.env.MASSIVE_PORTAL_URL; // e.g. dlvrit.portal.massive.io
+    const portalPassword = process.env.MASV_PORTAL_PASSWORD || "kizBy6-hujgaX";
 
     console.log("📦 Stripe PaymentIntent:");
     console.log("→ Email:", email);
@@ -29,13 +31,12 @@ app.post("/create-checkout-session", async (req, res) => {
       metadata: { product_id, quantity, email, project }
     });
 
-    // 2. Construct MASV portal upload URL
-    const portalUrl = process.env.MASSIVE_PORTAL_URL; // e.g. dlvrit.portal.massive.io
+    // 2. Construct MASV upload link (without auto-redirect)
     const encodedProject = encodeURIComponent(project || "DLVRIT Upload");
     const encodedEmail   = encodeURIComponent(email);
     const uploadUrl = `https://${portalUrl}?name=${encodedProject}&email=${encodedEmail}`;
 
-    // 3. Send confirmation email
+    // 3. Email the user
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: +process.env.SMTP_PORT || 587,
@@ -53,13 +54,15 @@ app.post("/create-checkout-session", async (req, res) => {
       html: `
         <p>Thanks for your payment!</p>
         <p><strong>Project:</strong> ${project || "N/A"}<br>
-        <strong>Minutes:</strong> ${quantity}<br>
-        <strong>Upload your file here:</strong> <a href="${uploadUrl}">${uploadUrl}</a></p>
+        <strong>Minutes:</strong> ${quantity}</p>
+        <p><strong>Upload your file here:</strong><br>
+        <a href="${uploadUrl}">${uploadUrl}</a></p>
+        <p><strong>Portal Password:</strong> ${portalPassword}</p>
         <p>Please upload your file using the link above. No account required.</p>
       `
     });
 
-    // 4. Return the link to the frontend
+    // 4. Return to frontend (optional)
     res.send({ success: true, uploadUrl });
 
   } catch (err) {
