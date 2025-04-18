@@ -12,7 +12,7 @@ app.post("/create-checkout-session", async (req, res) => {
   const { payment_method, product_id, quantity, email, project, promo } = req.body;
 
   try {
-    const totalAmount = quantity * 16000; // default base rate in pence
+    const totalAmount = quantity * 16000; // base price in pence
     console.log("📦 Stripe PaymentIntent:");
     console.log("→ Email:", email);
     console.log("→ Project:", project);
@@ -119,6 +119,28 @@ app.post("/create-checkout-session", async (req, res) => {
     res.status(err.response?.status || 500).send({
       error: err.response?.data?.message || err.message || "Unknown error"
     });
+  }
+});
+
+app.post("/validate-promo-code", async (req, res) => {
+  const { promo } = req.body;
+
+  try {
+    const promoList = await stripe.promotionCodes.list({ code: promo, active: true });
+    if (promoList.data.length > 0) {
+      const promoCode = promoList.data[0];
+      const coupon = await stripe.coupons.retrieve(promoCode.coupon.id);
+      res.json({
+        valid: true,
+        percent_off: coupon.percent_off || 0,
+        amount_off: coupon.amount_off || 0
+      });
+    } else {
+      res.json({ valid: false });
+    }
+  } catch (error) {
+    console.error("Promo validation error:", error.message);
+    res.json({ valid: false });
   }
 });
 
