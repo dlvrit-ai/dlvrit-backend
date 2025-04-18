@@ -1,7 +1,6 @@
 const express    = require("express");
 const app        = express();
 const stripe     = require("stripe")(process.env.STRIPE_SECRET_KEY);
-const axios      = require("axios");
 const cors       = require("cors");
 const nodemailer = require("nodemailer");
 
@@ -30,41 +29,11 @@ app.post("/create-checkout-session", async (req, res) => {
       metadata: { product_id, quantity, email, project }
     });
 
-    // 2. Create package via MASV
-    const teamId    = process.env.MASSIVE_TEAM_ID;
-    const apiKey    = process.env.MASSIVE_API_KEY;
-    const portalUrl = process.env.MASSIVE_PORTAL_URL;
-
-    const masvPayload = {
-      description: typeof project === "string" && project.trim() ? project.trim() : "Upload package for DLVRIT",
-      name: "DLVRIT Upload",
-      sender: email,
-      recipients: [email] // Updated format
-    };
-
-    console.log("📤 Sending MASV package request:");
-    console.log(JSON.stringify(masvPayload, null, 2));
-
-    const pkgRes = await axios.post(
-      `https://api.massive.app/v1/teams/${teamId}/packages`,
-      masvPayload,
-      {
-        headers: {
-          "X-API-KEY": apiKey,
-          "Content-Type": "application/json"
-        },
-        timeout: 10000
-      }
-    );
-
-    let uploadUrl = pkgRes.data.upload_url;
-    if (!uploadUrl && pkgRes.data.access_token) {
-      uploadUrl = `https://${portalUrl}/upload/${pkgRes.data.access_token}`;
-    }
-
-    if (!uploadUrl) {
-      throw new Error("MASV did not return an upload URL");
-    }
+    // 2. Construct MASV portal upload URL
+    const portalUrl = process.env.MASSIVE_PORTAL_URL; // e.g. dlvrit.portal.massive.io
+    const encodedProject = encodeURIComponent(project || "DLVRIT Upload");
+    const encodedEmail   = encodeURIComponent(email);
+    const uploadUrl = `https://${portalUrl}?name=${encodedProject}&email=${encodedEmail}`;
 
     // 3. Send confirmation email
     const transporter = nodemailer.createTransport({
@@ -90,7 +59,7 @@ app.post("/create-checkout-session", async (req, res) => {
       `
     });
 
-    // 4. Respond to frontend with redirect URL
+    // 4. Return the link to the frontend
     res.send({ success: true, uploadUrl });
 
   } catch (err) {
@@ -107,7 +76,7 @@ app.post("/create-checkout-session", async (req, res) => {
 });
 
 app.get("/", (req, res) => {
-  res.send("DLVRIT backend with Stripe, Massive.io and email is running.");
+  res.send("DLVRIT backend with Stripe, MASV Portal URL and email is running.");
 });
 
 const port = process.env.PORT || 3000;
