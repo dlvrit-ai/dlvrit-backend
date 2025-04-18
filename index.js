@@ -11,32 +11,44 @@ app.post("/create-checkout-session", async (req, res) => {
   const { payment_method, product_id, quantity, email, project } = req.body;
 
   try {
-    const totalAmount = quantity * 16000; // £160 per minute
+    // 1. Get Stripe price dynamically from product_id
+    const price = await stripe.prices.retrieve(product_id);
+    const unitAmount = price.unit_amount; // already in smallest currency unit
+    if (!unitAmount) throw new Error("Could not retrieve Stripe unit amount");
+
+    const totalAmount = unitAmount * quantity;
+    const currency = price.currency || "gbp";
+
     const portalUrl = process.env.MASSIVE_PORTAL_URL; // e.g. dlvrit.portal.massive.io
-    const portalPassword = process.env.MASV_PORTAL_PASSWORD || "kizBy6-hujgaX";
+    const portalPassword = process.env.MASV_PORTAL_PASSWORD;
+
+    if (!portalPassword) {
+      throw new Error("MASV portal password must be set in environment");
+    }
 
     console.log("📦 Stripe PaymentIntent:");
     console.log("→ Email:", email);
     console.log("→ Project:", project);
     console.log("→ Quantity:", quantity);
     console.log("→ Product ID:", product_id);
+    console.log("→ Total:", totalAmount, currency.toUpperCase());
 
-    // 1. Stripe PaymentIntent
+    // 2. Create Stripe PaymentIntent
     await stripe.paymentIntents.create({
       amount: totalAmount,
-      currency: "gbp",
+      currency,
       payment_method,
       confirm: true,
       receipt_email: email,
       metadata: { product_id, quantity, email, project }
     });
 
-    // 2. Construct MASV upload link (without auto-redirect)
+    // 3. Construct MASV upload URL (no auto-redirect)
     const encodedProject = encodeURIComponent(project || "DLVRIT Upload");
     const encodedEmail   = encodeURIComponent(email);
     const uploadUrl = `https://${portalUrl}?name=${encodedProject}&email=${encodedEmail}`;
 
-    // 3. Email the user
+    // 4. Send confirmation email
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: +process.env.SMTP_PORT || 587,
@@ -50,19 +62,22 @@ app.post("/create-checkout-session", async (req, res) => {
     await transporter.sendMail({
       from: '"DLVRIT.ai" <noreply@dlvrit.ai>',
       to: email,
-      subject: "Your DLVRIT.ai upload link",
+      bcc: "orders@dlvrit.ai",
+      subject: "✅ Your DLVRIT upload link is ready!",
       html: `
-        <p>Thanks for your payment!</p>
+        <p>Thanks for your payment! 🎉</p>
         <p><strong>Project:</strong> ${project || "N/A"}<br>
         <strong>Minutes:</strong> ${quantity}</p>
-        <p><strong>Upload your file here:</strong><br>
+        <p>🚀 <strong>Upload your file here:</strong><br>
         <a href="${uploadUrl}">${uploadUrl}</a></p>
-        <p><strong>Portal Password:</strong> ${portalPassword}</p>
-        <p>Please upload your file using the link above. No account required.</p>
+        <p>🔒 <strong>Portal Password:</strong> ${portalPassword}</p>
+        <p>Please upload your file using the link above. No account required.<br>
+        If you have any trouble, just reply to this email.</p>
+        <p>– The DLVRIT Team</p>
       `
     });
 
-    // 4. Return to frontend (optional)
+    // 5. Respond to frontend
     res.send({ success: true, uploadUrl });
 
   } catch (err) {
@@ -79,7 +94,7 @@ app.post("/create-checkout-session", async (req, res) => {
 });
 
 app.get("/", (req, res) => {
-  res.send("DLVRIT backend with Stripe, MASV Portal URL and email is running.");
+  res.send("DLVRIT backend with Stripe, MASV Portal and email is running.");
 });
 
 const port = process.env.PORT || 3000;
