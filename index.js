@@ -128,6 +128,31 @@ app.post("/checkout-success", async (req, res) => {
   }
 });
 
+app.post("/validate-promo-code", async (req, res) => {
+  const { promo } = req.body;
+
+  if (!promo) {
+    return res.status(400).send({ error: "Promo code is required." });
+  }
+
+  try {
+    const promotionCodes = await stripe.promotionCodes.list({
+      code: promo,
+      active: true,
+      limit: 1
+    });
+
+    if (promotionCodes.data.length === 0) {
+      return res.status(404).send({ error: "Promo code not found or inactive." });
+    }
+
+    res.send({ valid: true });
+  } catch (err) {
+    console.error("Promo validation error:", err);
+    res.status(500).send({ error: "Internal server error validating promo code." });
+  }
+});
+
 app.get("/", (req, res) => {
   res.send("DLVRIT backend is running with Stripe Checkout Sessions.");
 });
