@@ -9,42 +9,49 @@ app.use(cors());
 app.use(express.json());
 
 app.post("/create-checkout-session", async (req, res) => {
-  const { payment_method, product_id, quantity, email, project, promo } = req.body;
+  const { product_id, quantity, email, project, promo } = req.body;
 
   try {
-    const totalAmount = quantity * 16000; // base price in pence
-    console.log("📦 Stripe PaymentIntent:");
-    console.log("→ Email:", email);
-    console.log("→ Project:", project);
-    console.log("→ Quantity:", quantity);
-    console.log("→ Product ID:", product_id);
-    if (promo) console.log("→ Promo Code:", promo);
-
-    // Optional: apply promotion code if provided
-    let discountId = null;
-    if (promo) {
-      const promoList = await stripe.promotionCodes.list({ code: promo, active: true });
-      if (promoList.data.length === 0) throw new Error("Invalid or expired promo code.");
-      discountId = promoList.data[0].id;
-    }
-
-    // 1) Create PaymentIntent
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: totalAmount,
-      currency: "gbp",
-      payment_method,
-      confirm: true,
-      receipt_email: email,
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      mode: "payment",
+      line_items: [
+        {
+          price: product_id,
+          quantity: quantity,
+        }
+      ],
+      discounts: promo ? [{ promotion_code: promo }] : undefined,
+      customer_email: email,
       metadata: {
         email,
         project,
         quantity,
         promo: promo || "none"
       },
-      ...(discountId && { discounts: [{ promotion_code: discountId }] })
+      success_url: `${process.env.FRONTEND_URL}/success.html?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.FRONTEND_URL}/cancelled.html`
     });
 
-    // 2) Create MASV package
+    res.send({ sessionId: session.id });
+  } catch (err) {
+    console.error("❌ Stripe Checkout session error:", err.message);
+    res.status(500).send({ error: err.message });
+  }
+});
+
+app.post("/checkout-success", async (req, res) => {
+  const { session_id } = req.body;
+
+  try {
+    const session = await stripe.checkout.sessions.retrieve(session_id);
+    const email = session.customer_email;
+    const quantity = session.metadata.quantity;
+    const project = session.metadata.project;
+
+    console.log("✅ Stripe checkout successful for", email);
+
+    // 1. Create MASV package
     const teamId = process.env.MASSIVE_TEAM_ID;
     const apiKey = process.env.MASSIVE_API_KEY;
     const description = project || "DLVRIT Finishing Job";
@@ -77,7 +84,7 @@ app.post("/create-checkout-session", async (req, res) => {
     const password = process.env.MASSIVE_PORTAL_PASSWORD;
     const uploadUrl = `https://${portalURL}/upload/${accessToken}`;
 
-    // 3) Send confirmation email
+    // 2. Send email
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: +process.env.SMTP_PORT || 587,
@@ -106,7 +113,6 @@ app.post("/create-checkout-session", async (req, res) => {
       `
     });
 
-    // 4) Return response
     res.send({ success: true });
 
   } catch (err) {
@@ -122,30 +128,8 @@ app.post("/create-checkout-session", async (req, res) => {
   }
 });
 
-app.post("/validate-promo-code", async (req, res) => {
-  const { promo } = req.body;
-
-  try {
-    const promoList = await stripe.promotionCodes.list({ code: promo, active: true });
-    if (promoList.data.length > 0) {
-      const promoCode = promoList.data[0];
-      const coupon = await stripe.coupons.retrieve(promoCode.coupon.id);
-      res.json({
-        valid: true,
-        percent_off: coupon.percent_off || 0,
-        amount_off: coupon.amount_off || 0
-      });
-    } else {
-      res.json({ valid: false });
-    }
-  } catch (error) {
-    console.error("Promo validation error:", error.message);
-    res.json({ valid: false });
-  }
-});
-
 app.get("/", (req, res) => {
-  res.send("DLVRIT backend is running.");
+  res.send("DLVRIT backend is running with Stripe Checkout Sessions.");
 });
 
 const port = process.env.PORT || 3000;
