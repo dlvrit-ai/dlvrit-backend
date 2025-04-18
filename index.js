@@ -12,8 +12,7 @@ app.post("/create-checkout-session", async (req, res) => {
   const { payment_method, product_id, quantity, email, project, promo } = req.body;
 
   try {
-    const totalAmount = quantity * 16000; // default base rate, in smallest currency unit
-
+    const totalAmount = quantity * 16000; // default base rate in pence
     console.log("📦 Stripe PaymentIntent:");
     console.log("→ Email:", email);
     console.log("→ Project:", project);
@@ -74,11 +73,11 @@ app.post("/create-checkout-session", async (req, res) => {
     const accessToken = pkgRes.data?.access_token;
     if (!accessToken) throw new Error("MASV did not return an upload token");
 
-    const portalURL = process.env.MASSIVE_PORTAL_URL; // e.g. dlvrit.portal.massive.io
+    const portalURL = process.env.MASSIVE_PORTAL_URL;
     const password = process.env.MASSIVE_PORTAL_PASSWORD;
     const uploadUrl = `https://${portalURL}/upload/${accessToken}`;
 
-    // 3) Send email
+    // 3) Send confirmation email
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: +process.env.SMTP_PORT || 587,
@@ -107,7 +106,7 @@ app.post("/create-checkout-session", async (req, res) => {
       `
     });
 
-    // 4) Return success
+    // 4) Return response
     res.send({ success: true });
 
   } catch (err) {
