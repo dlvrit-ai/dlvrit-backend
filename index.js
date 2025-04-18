@@ -29,7 +29,7 @@ app.post("/create-checkout-session", async (req, res) => {
         quantity,
         promo: promo || "none"
       },
-      success_url: `${process.env.FRONTEND_URL}/success.html?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${process.env.FRONTEND_URL}/success.html`,
       cancel_url: `${process.env.FRONTEND_URL}/cancelled.html`
     });
 
