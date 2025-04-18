@@ -12,6 +12,23 @@ app.post("/create-checkout-session", async (req, res) => {
   const { product_id, quantity, email, project, promo } = req.body;
 
   try {
+    let promoId = null;
+
+    // Optional: Look up promotion code ID from code string
+    if (promo) {
+      const promoLookup = await stripe.promotionCodes.list({
+        code: promo,
+        active: true,
+        limit: 1
+      });
+
+      if (promoLookup.data.length === 0) {
+        return res.status(400).send({ error: "Invalid or inactive promo code." });
+      }
+
+      promoId = promoLookup.data[0].id;
+    }
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "payment",
@@ -21,7 +38,7 @@ app.post("/create-checkout-session", async (req, res) => {
           quantity: quantity,
         }
       ],
-      discounts: promo ? [{ promotion_code: promo }] : undefined,
+      discounts: promoId ? [{ promotion_code: promoId }] : undefined,
       customer_email: email,
       metadata: {
         email,
