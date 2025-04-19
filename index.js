@@ -14,7 +14,6 @@ app.post("/create-checkout-session", async (req, res) => {
   try {
     let promoId = null;
 
-    // Optional: Look up promotion code ID from code string
     if (promo) {
       const promoLookup = await stripe.promotionCodes.list({
         code: promo,
@@ -35,7 +34,7 @@ app.post("/create-checkout-session", async (req, res) => {
       line_items: [
         {
           price: product_id,
-          quantity: quantity,
+          quantity: quantity
         }
       ],
       discounts: promoId ? [{ promotion_code: promoId }] : undefined,
@@ -46,11 +45,12 @@ app.post("/create-checkout-session", async (req, res) => {
         quantity,
         promo: promo || "none"
       },
-      success_url: `${process.env.FRONTEND_URL}/success.html`,
+      success_url: `${process.env.FRONTEND_URL}/success.html?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.FRONTEND_URL}/cancelled.html`
     });
 
     res.send({ sessionId: session.id });
+
   } catch (err) {
     console.error("❌ Stripe Checkout session error:", err.message);
     res.status(500).send({ error: err.message });
