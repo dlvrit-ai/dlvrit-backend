@@ -20,22 +20,6 @@ app.post("/create-checkout-session", async (req, res) => {
     console.log("→ Product ID:", product_id);
     console.log("→ Promo Code:", promo);
 
-    let promoId = null;
-
-    if (promo) {
-      const promoLookup = await stripe.promotionCodes.list({
-        code: promo,
-        active: true,
-        limit: 1
-      });
-
-      if (promoLookup.data.length === 0) {
-        return res.status(400).send({ error: "Invalid or inactive promo code." });
-      }
-
-      promoId = promoLookup.data[0].id;
-    }
-
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "payment",
@@ -45,7 +29,7 @@ app.post("/create-checkout-session", async (req, res) => {
           quantity: quantity
         }
       ],
-      ...(promoId && { discounts: [{ promotion_code: promoId }] }),
+      discounts: promo ? [{ promotion_code: promo }] : undefined,
       customer_email: email,
       metadata: {
         email,
@@ -57,7 +41,7 @@ app.post("/create-checkout-session", async (req, res) => {
       cancel_url: `${process.env.FRONTEND_URL}/cancelled.html`
     });
 
-    res.send({ sessionId: session.id });
+    res.send({ url: session.url });
 
   } catch (err) {
     console.error("❌ Stripe Checkout session error:", err.message);
@@ -132,32 +116,7 @@ app.post("/checkout-success", async (req, res) => {
   }
 });
 
-// ✅ Promo validation endpoint (used by frontend)
-app.post("/validate-promo-code", async (req, res) => {
-  const { promo } = req.body;
-
-  if (!promo) {
-    return res.status(400).send({ error: "Promo code is required." });
-  }
-
-  try {
-    const promotionCodes = await stripe.promotionCodes.list({
-      code: promo,
-      active: true,
-      limit: 1
-    });
-
-    if (promotionCodes.data.length === 0) {
-      return res.status(404).send({ error: "Promo code not found or inactive." });
-    }
-
-    res.send({ valid: true });
-  } catch (err) {
-    console.error("Promo validation error:", err);
-    res.status(500).send({ error: "Internal server error validating promo code." });
-  }
-});
-
+// ✅ Root endpoint for testing
 app.get("/", (req, res) => {
   res.send("DLVRIT backend is running with Stripe Checkout Sessions.");
 });
