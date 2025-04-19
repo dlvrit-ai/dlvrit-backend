@@ -70,7 +70,6 @@ app.post("/checkout-success", async (req, res) => {
 
     console.log("✅ Stripe checkout successful for", email);
 
-    // 📦 MASV portal details (no API call, just custom portal link)
     const portalURL = process.env.MASSIVE_PORTAL_URL; // e.g. dlvrit.portal.massive.io
     const password = process.env.MASSIVE_PORTAL_PASSWORD;
 
@@ -81,7 +80,7 @@ app.post("/checkout-success", async (req, res) => {
 
     const uploadUrl = `https://${portalURL}?${queryParams.toString()}`;
 
-    // 📧 Send email
+    // 📧 Send confirmation email
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: +process.env.SMTP_PORT || 587,
@@ -105,6 +104,7 @@ app.post("/checkout-success", async (req, res) => {
         <p>🚀 Please upload your file using the link below:</p>
         <p><a href="${uploadUrl}">${uploadUrl}</a></p>
         <p><strong>🔐 Portal password:</strong> ${password}</p>
+        <p>📁 <a href="${process.env.FRONTEND_URL}/what-to-upload.html">Not sure what to upload? Here's a quick guide</a></p>
         <p>Once we receive your upload, we’ll begin work immediately.</p>
         <p>Thanks again,<br/>The DLVRIT team ✨</p>
       `
