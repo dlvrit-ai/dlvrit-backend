@@ -20,6 +20,22 @@ app.post("/create-checkout-session", async (req, res) => {
     console.log("→ Product ID:", product_id);
     console.log("→ Promo Code:", promo);
 
+    let promotionCodeId = undefined;
+
+    if (promo) {
+      const promoLookup = await stripe.promotionCodes.list({
+        code: promo,
+        active: true,
+        limit: 1
+      });
+
+      if (promoLookup.data.length === 0) {
+        return res.status(400).send({ error: "Promo code not valid" });
+      }
+
+      promotionCodeId = promoLookup.data[0].id;
+    }
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "payment",
@@ -29,7 +45,7 @@ app.post("/create-checkout-session", async (req, res) => {
           quantity: quantity
         }
       ],
-      discounts: promo ? [{ promotion_code: promo }] : undefined,
+      discounts: promotionCodeId ? [{ promotion_code: promotionCodeId }] : undefined,
       customer_email: email,
       metadata: {
         email,
