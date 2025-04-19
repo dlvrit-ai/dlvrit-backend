@@ -78,7 +78,7 @@ app.post("/checkout-success", async (req, res) => {
     console.log("✅ Stripe checkout successful for", email);
 
     const portalURL = process.env.MASSIVE_PORTAL_URL;
-    const password = process.env.MASSIVE_PORTAL_PASSWORD;
+    const password = process.env.MASV_PORTAL_PASSWORD;
 
     const queryParams = new URLSearchParams({
       sender_email: email,
