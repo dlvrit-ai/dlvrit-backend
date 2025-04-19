@@ -8,6 +8,7 @@ const nodemailer = require("nodemailer");
 app.use(cors());
 app.use(express.json());
 
+// ✅ Create Stripe Checkout Session
 app.post("/create-checkout-session", async (req, res) => {
   const { product_id, quantity, email, project, promo } = req.body;
 
@@ -57,6 +58,7 @@ app.post("/create-checkout-session", async (req, res) => {
   }
 });
 
+// ✅ Handle Checkout Success: send portal link email
 app.post("/checkout-success", async (req, res) => {
   const { session_id } = req.body;
 
@@ -68,40 +70,18 @@ app.post("/checkout-success", async (req, res) => {
 
     console.log("✅ Stripe checkout successful for", email);
 
-    // 1. Create MASV package
-    const teamId = process.env.MASSIVE_TEAM_ID;
-    const apiKey = process.env.MASSIVE_API_KEY;
-    const description = project || "DLVRIT Finishing Job";
-
-    const masvPayload = {
-      description,
-      name: "DLVRIT Upload",
-      sender: email,
-      recipients: [email]
-    };
-
-    console.log("📤 Sending MASV package request:");
-    console.log(JSON.stringify(masvPayload, null, 2));
-
-    const pkgRes = await axios.post(
-      `https://api.massive.app/v1/teams/${teamId}/packages`,
-      masvPayload,
-      {
-        headers: {
-          "X-API-KEY": apiKey,
-          "Content-Type": "application/json"
-        }
-      }
-    );
-
-    const accessToken = pkgRes.data?.access_token;
-    if (!accessToken) throw new Error("MASV did not return an upload token");
-
-    const portalURL = process.env.MASSIVE_PORTAL_URL;
+    // 📦 MASV portal details (no API call, just custom portal link)
+    const portalURL = process.env.MASSIVE_PORTAL_URL; // e.g. dlvrit.portal.massive.io
     const password = process.env.MASSIVE_PORTAL_PASSWORD;
-    const uploadUrl = `https://${portalURL}/upload/${accessToken}`;
 
-    // 2. Send email
+    const queryParams = new URLSearchParams({
+      sender_email: email,
+      package_name: project
+    });
+
+    const uploadUrl = `https://${portalURL}?${queryParams.toString()}`;
+
+    // 📧 Send email
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: +process.env.SMTP_PORT || 587,
@@ -122,7 +102,7 @@ app.post("/checkout-success", async (req, res) => {
         <p>Thanks for your order – we're all set to receive your file.</p>
         <p><strong>Project:</strong> ${project || "N/A"}<br/>
         <strong>Minutes:</strong> ${quantity}</p>
-        <p>🚀 Please upload your file at the link below:</p>
+        <p>🚀 Please upload your file using the link below:</p>
         <p><a href="${uploadUrl}">${uploadUrl}</a></p>
         <p><strong>🔐 Portal password:</strong> ${password}</p>
         <p>Once we receive your upload, we’ll begin work immediately.</p>
@@ -145,6 +125,7 @@ app.post("/checkout-success", async (req, res) => {
   }
 });
 
+// ✅ Promo validation endpoint (used by frontend)
 app.post("/validate-promo-code", async (req, res) => {
   const { promo } = req.body;
 
