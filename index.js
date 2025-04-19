@@ -13,6 +13,13 @@ app.post("/create-checkout-session", async (req, res) => {
   const { product_id, quantity, email, project, promo } = req.body;
 
   try {
+    console.log("📦 Stripe Checkout Session:");
+    console.log("→ Email:", email);
+    console.log("→ Project:", project);
+    console.log("→ Quantity:", quantity);
+    console.log("→ Product ID:", product_id);
+    console.log("→ Promo Code:", promo);
+
     let promoId = null;
 
     if (promo) {
@@ -38,7 +45,7 @@ app.post("/create-checkout-session", async (req, res) => {
           quantity: quantity
         }
       ],
-      discounts: promoId ? [{ promotion_code: promoId }] : undefined,
+      ...(promoId && { discounts: [{ promotion_code: promoId }] }),
       customer_email: email,
       metadata: {
         email,
@@ -70,7 +77,7 @@ app.post("/checkout-success", async (req, res) => {
 
     console.log("✅ Stripe checkout successful for", email);
 
-    const portalURL = process.env.MASSIVE_PORTAL_URL; // e.g. dlvrit.portal.massive.io
+    const portalURL = process.env.MASSIVE_PORTAL_URL;
     const password = process.env.MASSIVE_PORTAL_PASSWORD;
 
     const queryParams = new URLSearchParams({
